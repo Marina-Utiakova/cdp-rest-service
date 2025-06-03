@@ -104,7 +104,7 @@ EOF
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
-                    dir('initial') {
+                    dir('complete') {
                         sh """
                           aws s3 cp target/${ARTIFACT_ID}-${VERSION}.jar s3://${BUCKET_NAME}/${ARTIFACT_ID}-${VERSION}.jar
                         """
