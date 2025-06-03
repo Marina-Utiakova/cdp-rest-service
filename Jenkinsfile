@@ -10,9 +10,6 @@ pipeline {
         NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
         REPO_RELEASE        = 'vprofile-release'
         REPO_SNAPSHOT       = 'vprofile-snapshot'
-
-        GROUP_ID            = 'org.springframework.boot'
-        ARTIFACT_ID         = 'rest-service-complete'
         BUCKET_NAME         = 'cdp-project-artifacts'
         AWS_CREDS_ID        = 'aws-creds'
     }
@@ -21,17 +18,14 @@ pipeline {
             steps {
                 dir('complete') {
                     script {
-                        // Считаем artifactId из pom.xml
                         env.ARTIFACT_ID = sh(
                             script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout",
                             returnStdout: true
                         ).trim()
-                        // Считаем version  из pom.xml
                         env.VERSION = sh(
                             script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
                             returnStdout: true
                         ).trim()
-                        // (необязательно) можно взять groupId, если нужно:
                         env.GROUP_ID = sh(
                             script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout",
                             returnStdout: true
@@ -93,7 +87,6 @@ EOF
             steps {
                 dir('complete') {
                     script {
-                        // Выбираем snapshot или release
                         def repo = env.VERSION.endsWith('-SNAPSHOT') 
                                    ? env.REPO_SNAPSHOT 
                                    : env.REPO_RELEASE
