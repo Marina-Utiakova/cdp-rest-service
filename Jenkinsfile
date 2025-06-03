@@ -1,4 +1,4 @@
-// Jenkinsfile for rest-service-initial
+// Jenkinsfile for rest-service-initial 
 
 pipeline {
     agent any
@@ -13,6 +13,7 @@ pipeline {
 
         GROUP_ID            = 'com.example'
         ARTIFACT_ID         = 'rest-service-initial'
+        BUCKET_NAME         = 'cdp-project-artifacts'
     }
 
     stages {
@@ -95,15 +96,32 @@ EOF
                 }
             }
         }
+
+        stage('Upload JAR to S3') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-terraform-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    dir('initial') {
+                        sh """
+                          aws s3 cp target/${ARTIFACT_ID}-${VERSION}.jar s3://${BUCKET_NAME}/${ARTIFACT_ID}-${VERSION}.jar
+                        """
+                    }
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo "✅ Published ${GROUP_ID}:${ARTIFACT_ID}:${VERSION} to Nexus"
+            echo "✅ Published ${GROUP_ID}:${ARTIFACT_ID}:${VERSION} to Nexus and uploaded to S3"
         }
         failure {
-            echo "❌ Build or deploy failed"
+            echo "❌ Build, deploy or upload failed"
         }
     }
 }
+
 
