@@ -1,31 +1,46 @@
-// Jenkinsfile for rest-service-initial
+// Jenkinsfile
 
 pipeline {
     agent any
     tools { maven 'MAVEN3' }
 
     environment {
-        NEXUS_HOSTPORT      = '52.90.92.46:8081'   // Nexus:port
+        // Nexus
+        NEXUS_HOSTPORT      = '52.90.92.46:8081'
         NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
         NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
         REPO_RELEASE        = 'vprofile-release'
         REPO_SNAPSHOT       = 'vprofile-snapshot'
+
+        // AWS/S3
         BUCKET_NAME         = 'cdp-project-artifacts'
         AWS_CREDS_ID        = 'aws-creds'
     }
 
-    stage('Extract Maven coordinates') {
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Extract Maven coordinates') {
             steps {
                 dir('complete') {
                     script {
+                        // Считываем artifactId из pom.xml
                         env.ARTIFACT_ID = sh(
                             script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout",
                             returnStdout: true
                         ).trim()
+
+                        // Считываем version из pom.xml
                         env.VERSION = sh(
                             script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
                             returnStdout: true
                         ).trim()
+
+                        // Считываем groupId из pom.xml
                         env.GROUP_ID = sh(
                             script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout",
                             returnStdout: true
@@ -77,8 +92,8 @@ EOF
         stage('Verify JAR in target') {
             steps {
                 dir('complete/target') {
-                    sh 'echo "=== Files in target/ ==="'
-                    sh 'ls -lh target/'
+                    echo '=== Files in complete/target ==='
+                    sh 'ls -lh'
                 }
             }
         }
@@ -87,6 +102,7 @@ EOF
             steps {
                 dir('complete') {
                     script {
+                        // Выбираем snapshot или release
                         def repo = env.VERSION.endsWith('-SNAPSHOT') 
                                    ? env.REPO_SNAPSHOT 
                                    : env.REPO_RELEASE
@@ -134,7 +150,7 @@ EOF
 
     post {
         success {
-            echo "✅ Artifact ${ARTIFACT_ID}:${VERSION} успешно опубликован в Nexus и загружен в S3"
+            echo "✅ Artifact ${env.ARTIFACT_ID}:${env.VERSION} успешно опубликован в Nexus и загружен в S3"
         }
         failure {
             echo "❌ Build, deploy или upload завершился с ошибкой"
