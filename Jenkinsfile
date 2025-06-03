@@ -5,8 +5,8 @@ pipeline {
     environment {
         // Nexus
         NEXUS_HOSTPORT      = '52.90.92.46:8081'
-        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
-        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
+        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'   // для чтения (build)
+        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'     // для заливки (deploy)
         REPO_RELEASE        = 'vprofile-release'
         REPO_SNAPSHOT       = 'vprofile-snapshot'
 
@@ -61,7 +61,7 @@ pipeline {
                         passwordVariable: 'NEXUS_PSW'
                     )]) {
                         sh """
-                          cat > settings.xml <<EOF
+                          cat > settings-build.xml <<EOF
 <settings>
   <mirrors>
     <mirror>
@@ -80,7 +80,7 @@ pipeline {
   </servers>
 </settings>
 EOF
-                          mvn -s settings.xml clean package -DskipTests
+                          mvn -s settings-build.xml clean package -DskipTests
                         """
                     }
                 }
@@ -100,29 +100,41 @@ EOF
             steps {
                 dir('complete') {
                     script {
-                        // Выбираем snapshot или release
-                        def repo = env.VERSION.endsWith('-SNAPSHOT')
-                                   ? env.REPO_SNAPSHOT
-                                   : env.REPO_RELEASE
+                        // Выбираем, куда заливать: snapshot или release
+                        def isSnapshot = env.VERSION.endsWith('-SNAPSHOT')
+                        def repoId     = isSnapshot ? env.REPO_SNAPSHOT : env.REPO_RELEASE
+                        def repoUrl    = "http://${env.NEXUS_HOSTPORT}/repository/${repoId}/"
 
-                        echo "Uploading target/${env.ARTIFACT_ID}-${env.VERSION}.jar to Nexus repo ${repo}"
+                        echo "Uploading ${env.ARTIFACT_ID}-${env.VERSION}.jar to Nexus repo '${repoId}' (URL: ${repoUrl})"
 
-                        nexusArtifactUploader(
-                            nexusVersion:  'nexus3',
-                            protocol:      'http',
-                            nexusUrl:      env.NEXUS_HOSTPORT,
-                            repository:    repo,
+                        // Берём креденшиалы, чтобы записать их в новый settings-deploy.xml
+                        withCredentials([usernamePassword(
                             credentialsId: env.NEXUS_UPLOAD_CRED,
-                            artifacts: [
-                                [
-                                    groupId:    env.GROUP_ID,
-                                    artifactId: env.ARTIFACT_ID,
-                                    version:    env.VERSION,
-                                    type:       'jar',
-                                    file:       "target/${env.ARTIFACT_ID}-${env.VERSION}.jar"
-                                ]
-                            ]
-                        )
+                            usernameVariable: 'NEXUS_DEPLOY_USR',
+                            passwordVariable: 'NEXUS_DEPLOY_PSW'
+                        )]) {
+                            sh """
+                              cat > settings-deploy.xml <<EOF
+<settings>
+  <servers>
+    <server>
+      <id>${repoId}</id>
+      <username>\${NEXUS_DEPLOY_USR}</username>
+      <password>\${NEXUS_DEPLOY_PSW}</password>
+    </server>
+  </servers>
+</settings>
+EOF
+                              mvn -s settings-deploy.xml deploy:deploy-file \\
+                                -Durl=${repoUrl} \\
+                                -DrepositoryId=${repoId} \\
+                                -Dfile=target/${env.ARTIFACT_ID}-${env.VERSION}.jar \\
+                                -DgroupId=${env.GROUP_ID} \\
+                                -DartifactId=${env.ARTIFACT_ID} \\
+                                -Dversion=${env.VERSION} \\
+                                -Dpackaging=jar
+                            """
+                        }
                     }
                 }
             }
@@ -133,15 +145,15 @@ EOF
                 expression { currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: env.AWS_CREDS_ID,
-                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                )]) {
-                    dir('complete/target') {
+                dir('complete/target') {
+                    withCredentials([usernamePassword(
+                        credentialsId: env.AWS_CREDS_ID,
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )]) {
                         sh """
-                          aws s3 cp ${env.ARTIFACT_ID}-${env.VERSION}.jar \
-                                    s3://${BUCKET_NAME}/${env.ARTIFACT_ID}-${env.VERSION}.jar \
+                          aws s3 cp ${env.ARTIFACT_ID}-${env.VERSION}.jar \\
+                                    s3://${BUCKET_NAME}/${env.ARTIFACT_ID}-${env.VERSION}.jar \\
                                     --region us-east-1
                         """
                     }
@@ -159,3 +171,4 @@ EOF
         }
     }
 }
+
