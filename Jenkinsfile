@@ -5,7 +5,7 @@ pipeline {
     tools { maven 'MAVEN3' }
 
     environment {
-        NEXUS_HOSTPORT      = '34.239.104.64:8081'   // Nexus:port
+        NEXUS_HOSTPORT      = '52.90.92.46:8081'   // Nexus:port
         NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
         NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
         REPO_RELEASE        = 'vprofile-release'
