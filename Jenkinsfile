@@ -5,8 +5,8 @@ pipeline {
     environment {
         // Nexus
         NEXUS_HOSTPORT      = '52.90.92.46:8081'
-        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'   // для чтения (build)
-        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'     // для заливки (deploy)
+        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'   
+        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'     
         REPO_RELEASE        = 'vprofile-release'
         REPO_SNAPSHOT       = 'vprofile-snapshot'
 
@@ -26,19 +26,16 @@ pipeline {
             steps {
                 dir('complete') {
                     script {
-                        // Считываем artifactId из pom.xml
                         env.ARTIFACT_ID = sh(
                             script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout",
                             returnStdout: true
                         ).trim()
 
-                        // Считываем version из pom.xml
                         env.VERSION = sh(
                             script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
                             returnStdout: true
                         ).trim()
 
-                        // Считываем groupId из pom.xml
                         env.GROUP_ID = sh(
                             script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout",
                             returnStdout: true
@@ -100,14 +97,12 @@ EOF
             steps {
                 dir('complete') {
                     script {
-                        // Выбираем, куда заливать: snapshot или release
                         def isSnapshot = env.VERSION.endsWith('-SNAPSHOT')
                         def repoId     = isSnapshot ? env.REPO_SNAPSHOT : env.REPO_RELEASE
                         def repoUrl    = "http://${env.NEXUS_HOSTPORT}/repository/${repoId}/"
 
                         echo "Uploading ${env.ARTIFACT_ID}-${env.VERSION}.jar to Nexus repo '${repoId}' (URL: ${repoUrl})"
 
-                        // Берём креденшиалы, чтобы записать их в новый settings-deploy.xml
                         withCredentials([usernamePassword(
                             credentialsId: env.NEXUS_UPLOAD_CRED,
                             usernameVariable: 'NEXUS_DEPLOY_USR',
