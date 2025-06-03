@@ -11,15 +11,37 @@ pipeline {
         REPO_RELEASE        = 'vprofile-release'
         REPO_SNAPSHOT       = 'vprofile-snapshot'
 
-        GROUP_ID            = 'com.example'
-        ARTIFACT_ID         = 'rest-service-initial'
+        GROUP_ID            = 'org.springframework.boot'
+        ARTIFACT_ID         = 'rest-service-complete'
         BUCKET_NAME         = 'cdp-project-artifacts'
+        AWS_CREDS_ID        = 'aws-creds'
     }
 
-    stages {
-        stage('Checkout') {
+    stage('Extract Maven coordinates') {
             steps {
-                checkout scm
+                dir('complete') {
+                    script {
+                        // Считаем artifactId из pom.xml
+                        env.ARTIFACT_ID = sh(
+                            script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout",
+                            returnStdout: true
+                        ).trim()
+                        // Считаем version  из pom.xml
+                        env.VERSION = sh(
+                            script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
+                            returnStdout: true
+                        ).trim()
+                        // (необязательно) можно взять groupId, если нужно:
+                        env.GROUP_ID = sh(
+                            script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Detected artifactId = ${env.ARTIFACT_ID}"
+                        echo "Detected version    = ${env.VERSION}"
+                        echo "Detected groupId    = ${env.GROUP_ID}"
+                    }
+                }
             }
         }
 
@@ -58,16 +80,11 @@ EOF
             }
         }
 
-        stage('Determine Version') {
+        stage('Verify JAR in target') {
             steps {
-                dir('complete') {
-                    script {
-                        env.VERSION = sh(
-                            script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
-                            returnStdout: true
-                        ).trim()
-                        echo "Project version is ${env.VERSION}"
-                    }
+                dir('complete/target') {
+                    sh 'echo "=== Files in target/ ==="'
+                    sh 'ls -lh target/'
                 }
             }
         }
@@ -76,21 +93,24 @@ EOF
             steps {
                 dir('complete') {
                     script {
-                        def repo = env.VERSION.endsWith('-SNAPSHOT') ? env.REPO_SNAPSHOT : env.REPO_RELEASE
+                        // Выбираем snapshot или release
+                        def repo = env.VERSION.endsWith('-SNAPSHOT') 
+                                   ? env.REPO_SNAPSHOT 
+                                   : env.REPO_RELEASE
+
+                        echo "Uploading target/${env.ARTIFACT_ID}-${env.VERSION}.jar to Nexus repo ${repo}"
 
                         nexusArtifactUploader(
-                            nexusVersion: 'nexus3',
-                            protocol:    'http',
-                            nexusUrl:    env.NEXUS_HOSTPORT,
-                            repository:  repo,
+                            nexusVersion:  'nexus3',
+                            protocol:      'http',
+                            nexusUrl:      env.NEXUS_HOSTPORT,
+                            repository:    repo,
                             credentialsId: env.NEXUS_UPLOAD_CRED,
-                            groupId:     env.GROUP_ID,
-                            version:     env.VERSION,
-                            artifacts: [[
-                                artifactId: env.ARTIFACT_ID,
-                                file:       "target/${env.ARTIFACT_ID}-${env.VERSION}.jar",
-                                type:       'jar'
-                            ]]
+                            groupId:       env.GROUP_ID,
+                            artifactId:    env.ARTIFACT_ID,
+                            version:       env.VERSION,
+                            packaging:     'jar',
+                            file:          "target/${env.ARTIFACT_ID}-${env.VERSION}.jar"
                         )
                     }
                 }
@@ -98,15 +118,20 @@ EOF
         }
 
         stage('Upload JAR to S3') {
+            when {
+                expression { currentBuild.currentResult == 'SUCCESS' }
+            }
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'aws-creds',
+                    credentialsId: env.AWS_CREDS_ID,
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
-                    dir('complete') {
+                    dir('complete/target') {
                         sh """
-                          aws s3 cp target/${ARTIFACT_ID}-${VERSION}.jar s3://${BUCKET_NAME}/${ARTIFACT_ID}-${VERSION}.jar
+                          aws s3 cp ${env.ARTIFACT_ID}-${env.VERSION}.jar \
+                                    s3://${BUCKET_NAME}/${env.ARTIFACT_ID}-${env.VERSION}.jar \
+                                    --region us-east-1
                         """
                     }
                 }
@@ -116,10 +141,10 @@ EOF
 
     post {
         success {
-            echo "✅ Published ${GROUP_ID}:${ARTIFACT_ID}:${VERSION} to Nexus and uploaded to S3"
+            echo "✅ Artifact ${ARTIFACT_ID}:${VERSION} успешно опубликован в Nexus и загружен в S3"
         }
         failure {
-            echo "❌ Build, deploy or upload failed"
+            echo "❌ Build, deploy или upload завершился с ошибкой"
         }
     }
 }
