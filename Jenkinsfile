@@ -1,4 +1,4 @@
-// Jenkinsfile for rest-service-initial 
+// Jenkinsfile for rest-service-initial
 
 pipeline {
     agent any
@@ -6,10 +6,10 @@ pipeline {
 
     environment {
         NEXUS_HOSTPORT      = '34.239.104.64:8081'   // Nexus:port
-        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'      
-        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'       
-        REPO_RELEASE        = 'vprofile-release'     
-        REPO_SNAPSHOT       = 'vprofile-snapshot'  
+        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
+        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
+        REPO_RELEASE        = 'vprofile-release'
+        REPO_SNAPSHOT       = 'vprofile-snapshot'
 
         GROUP_ID            = 'com.example'
         ARTIFACT_ID         = 'rest-service-initial'
@@ -100,7 +100,7 @@ EOF
         stage('Upload JAR to S3') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'aws-terraform-creds',
+                    credentialsId: 'aws-creds',
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
@@ -123,5 +123,6 @@ EOF
         }
     }
 }
+
 
 
