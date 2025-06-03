@@ -1,4 +1,4 @@
-pipeline {
+ppipeline {
     agent any
     tools { maven 'MAVEN3' }
 
@@ -101,8 +101,8 @@ EOF
                 dir('complete') {
                     script {
                         // Выбираем snapshot или release
-                        def repo = env.VERSION.endsWith('-SNAPSHOT') 
-                                   ? env.REPO_SNAPSHOT 
+                        def repo = env.VERSION.endsWith('-SNAPSHOT')
+                                   ? env.REPO_SNAPSHOT
                                    : env.REPO_RELEASE
 
                         echo "Uploading target/${env.ARTIFACT_ID}-${env.VERSION}.jar to Nexus repo ${repo}"
@@ -118,8 +118,8 @@ EOF
                                     groupId:    env.GROUP_ID,
                                     artifactId: env.ARTIFACT_ID,
                                     version:    env.VERSION,
-                                    packaging:  'jar',
-                                    filePath:   "target/${env.ARTIFACT_ID}-${env.VERSION}.jar"
+                                    type:       'jar',
+                                    file:       "target/${env.ARTIFACT_ID}-${env.VERSION}.jar"
                                 ]
                             ]
                         )
