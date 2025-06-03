@@ -25,7 +25,7 @@ pipeline {
 
         stage('Build JAR') {
             steps {
-                dir('initial') {
+                dir('complete') {
                     withCredentials([usernamePassword(
                         credentialsId: env.NEXUS_DOWNLOAD_CRED,
                         usernameVariable: 'NEXUS_USR',
@@ -60,7 +60,7 @@ EOF
 
         stage('Determine Version') {
             steps {
-                dir('initial') {
+                dir('complete') {
                     script {
                         env.VERSION = sh(
                             script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
@@ -74,7 +74,7 @@ EOF
 
         stage('Publish to Nexus') {
             steps {
-                dir('initial') {
+                dir('complete') {
                     script {
                         def repo = env.VERSION.endsWith('-SNAPSHOT') ? env.REPO_SNAPSHOT : env.REPO_RELEASE
 
