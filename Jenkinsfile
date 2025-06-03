@@ -1,15 +1,15 @@
-// Jenkinsfile для rest-service-initial (с учётом, что pom.xml лежит в подпапке initial)
+// Jenkinsfile for rest-service-initial
 
 pipeline {
     agent any
     tools { maven 'MAVEN3' }
 
     environment {
-        NEXUS_HOSTPORT      = '34.239.104.64:8081'   // замените на ваш Nexus:port
-        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'      // ID Jenkins-учётки для mirror
-        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'       // ID Jenkins-учётки для выкладки
-        REPO_RELEASE        = 'vprofile-release'     // имя release-репо в Nexus
-        REPO_SNAPSHOT       = 'vprofile-snapshot'    // имя snapshot-репо в Nexus
+        NEXUS_HOSTPORT      = '34.239.104.64:8081'   // Nexus:port
+        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'      
+        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'       
+        REPO_RELEASE        = 'vprofile-release'     
+        REPO_SNAPSHOT       = 'vprofile-snapshot'  
 
         GROUP_ID            = 'com.example'
         ARTIFACT_ID         = 'rest-service-initial'
@@ -18,14 +18,12 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // Скачиваем весь репозиторий
                 checkout scm
             }
         }
 
         stage('Build JAR') {
             steps {
-                // Переходим в папку initial, где лежит pom.xml
                 dir('initial') {
                     withCredentials([usernamePassword(
                         credentialsId: env.NEXUS_DOWNLOAD_CRED,
