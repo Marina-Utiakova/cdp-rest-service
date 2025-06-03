@@ -1,5 +1,3 @@
-// Jenkinsfile
-
 pipeline {
     agent any
     tools { maven 'MAVEN3' }
@@ -115,11 +113,15 @@ EOF
                             nexusUrl:      env.NEXUS_HOSTPORT,
                             repository:    repo,
                             credentialsId: env.NEXUS_UPLOAD_CRED,
-                            groupId:       env.GROUP_ID,
-                            artifactId:    env.ARTIFACT_ID,
-                            version:       env.VERSION,
-                            packaging:     'jar',
-                            file:          "target/${env.ARTIFACT_ID}-${env.VERSION}.jar"
+                            artifacts: [
+                                [
+                                    groupId:    env.GROUP_ID,
+                                    artifactId: env.ARTIFACT_ID,
+                                    version:    env.VERSION,
+                                    packaging:  'jar',
+                                    filePath:   "target/${env.ARTIFACT_ID}-${env.VERSION}.jar"
+                                ]
+                            ]
                         )
                     }
                 }
@@ -157,6 +159,3 @@ EOF
         }
     }
 }
-
-
-
