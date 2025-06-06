@@ -238,5 +238,5 @@ EOF
             echo "❌ Build, deploy or upload failed"
         }
     }
-}
+    
 
