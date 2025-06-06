@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         // Nexus
-        NEXUS_HOSTPORT      = '52.90.92.46:8081'
+        NEXUS_HOSTPORT      = '54.211.27.221:8081'
         NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'   
         NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'     
         REPO_RELEASE        = 'vprofile-release'
@@ -13,6 +13,10 @@ pipeline {
         // AWS/S3
         BUCKET_NAME         = 'cdp-project-artifacts'
         AWS_CREDS_ID        = 'aws-creds'
+
+        // SonarQube (Jenkins → Configure System → SonarQube servers and SonarScanner)
+        SONAR_SERVER_ID     = 'MySonarQube'         // in Configure System
+        SONAR_SCANNER_TOOL  = 'sonar-scanner'       // in Global Tool Configuration
     }
 
     stages {
@@ -49,6 +53,36 @@ pipeline {
             }
         }
 
+        // ---------- SonarQube Analysis ----------
+        stage('Code Analysis with SonarQube') {
+            when { expression { env.SONAR_SERVER_ID != null && env.SONAR_SCANNER_TOOL != null } }
+            environment {
+                scannerHome = tool "${SONAR_SCANNER_TOOL}"
+            }
+            steps {
+                dir('complete') {
+                    withSonarQubeEnv("${SONAR_SERVER_ID}") {
+                        sh """
+                          mvn clean verify sonar:sonar \
+                            -Dsonar.projectKey=${env.ARTIFACT_ID} \
+                            -Dsonar.projectName=${env.ARTIFACT_ID} \
+                            -Dsonar.projectVersion=${env.VERSION} \
+                            -Dsonar.host.url=\$SONAR_HOST_URL \
+                            -Dsonar.login=\$SONAR_AUTH_TOKEN
+                        """
+                    }
+                }
+            }
+        }
+        stage('Quality Gate') {
+            when { expression { env.SONAR_SERVER_ID != null } }
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    
         stage('Build JAR') {
             steps {
                 dir('complete') {
@@ -157,12 +191,51 @@ EOF
         }
     }
 
+    // ---------- Deploy to Staging ----------
+        stage('Deploy to Staging') {
+            when {
+                expression { currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                script {
+                    def beAppName       = 'rest-service-initial'
+                    def beEnvName       = 'rest-service-staging'
+                    def versionLabel    = "${env.ARTIFACT_ID}-${env.VERSION}-${env.BUILD_ID}"
+                    def s3Key           = "${env.ARTIFACT_ID}-${env.VERSION}.jar"
+
+                    withCredentials([usernamePassword(
+                        credentialsId: env.AWS_CREDS_ID,
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )]) {
+                        sh """
+                          aws elasticbeanstalk create-application-version \\
+                            --application-name ${beAppName} \\
+                            --version-label ${versionLabel} \\
+                            --source-bundle S3Bucket=${BUCKET_NAME},S3Key=${s3Key} \\
+                            --region us-east-1
+                        """
+
+                        sh """
+                          aws elasticbeanstalk update-environment \\
+                            --application-name ${beAppName} \\
+                            --environment-name ${beEnvName} \\
+                            --version-label ${versionLabel} \\
+                            --region us-east-1
+                        """
+                    }
+                }
+            }
+        }
+        
+    }
+
     post {
         success {
-            echo "✅ Artifact ${env.ARTIFACT_ID}:${env.VERSION} успешно опубликован в Nexus и загружен в S3"
+            echo "✅ Artifact ${env.ARTIFACT_ID}:${env.VERSION} successfully published to Nexus and uploaded to S3"
         }
         failure {
-            echo "❌ Build, deploy или upload завершился с ошибкой"
+            echo "❌ Build, deploy or upload failed"
         }
     }
 }
