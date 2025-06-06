@@ -1,12 +1,14 @@
 pipeline {
     agent any
-    tools { maven 'MAVEN3' }
+    tools {
+        maven 'MAVEN3'
+    }
 
     environment {
         // Nexus
         NEXUS_HOSTPORT      = '54.211.27.221:8081'
-        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'   
-        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'     
+        NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
+        NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
         REPO_RELEASE        = 'vprofile-release'
         REPO_SNAPSHOT       = 'vprofile-snapshot'
 
@@ -15,8 +17,8 @@ pipeline {
         AWS_CREDS_ID        = 'aws-creds'
 
         // SonarQube (Jenkins → Configure System → SonarQube servers and SonarScanner)
-        SONAR_SERVER_ID     = 'MySonarQube'         // in Configure System
-        SONAR_SCANNER_TOOL  = 'sonar-scanner'       // in Global Tool Configuration
+        SONAR_SERVER_ID     = 'MySonarQube'
+        SONAR_SCANNER_TOOL  = 'sonar-scanner'
     }
 
     stages {
@@ -67,13 +69,14 @@ pipeline {
                             -Dsonar.projectKey=${env.ARTIFACT_ID} \
                             -Dsonar.projectName=${env.ARTIFACT_ID} \
                             -Dsonar.projectVersion=${env.VERSION} \
-                            -Dsonar.host.url=\$SONAR_HOST_URL \
-                            -Dsonar.login=\$SONAR_AUTH_TOKEN
+                            -Dsonar.host.url=\\$SONAR_HOST_URL \
+                            -Dsonar.login=\\$SONAR_AUTH_TOKEN
                         """
                     }
                 }
             }
         }
+
         stage('Quality Gate') {
             when { expression { env.SONAR_SERVER_ID != null } }
             steps {
@@ -82,15 +85,17 @@ pipeline {
                 }
             }
         }
-    
+
         stage('Build JAR') {
             steps {
                 dir('complete') {
-                    withCredentials([usernamePassword(
-                        credentialsId: env.NEXUS_DOWNLOAD_CRED,
-                        usernameVariable: 'NEXUS_USR',
-                        passwordVariable: 'NEXUS_PSW'
-                    )]) {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: env.NEXUS_DOWNLOAD_CRED,
+                            usernameVariable: 'NEXUS_USR',
+                            passwordVariable: 'NEXUS_PSW'
+                        )
+                    ]) {
                         sh """
                           cat > settings-build.xml <<EOF
 <settings>
@@ -105,8 +110,8 @@ pipeline {
   <servers>
     <server>
       <id>nexus-public</id>
-      <username>\${NEXUS_USR}</username>
-      <password>\${NEXUS_PSW}</password>
+      <username>\\\${NEXUS_USR}</username>
+      <password>\\\${NEXUS_PSW}</password>
     </server>
   </servers>
 </settings>
@@ -137,19 +142,21 @@ EOF
 
                         echo "Uploading ${env.ARTIFACT_ID}-${env.VERSION}.jar to Nexus repo '${repoId}' (URL: ${repoUrl})"
 
-                        withCredentials([usernamePassword(
-                            credentialsId: env.NEXUS_UPLOAD_CRED,
-                            usernameVariable: 'NEXUS_DEPLOY_USR',
-                            passwordVariable: 'NEXUS_DEPLOY_PSW'
-                        )]) {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: env.NEXUS_UPLOAD_CRED,
+                                usernameVariable: 'NEXUS_DEPLOY_USR',
+                                passwordVariable: 'NEXUS_DEPLOY_PSW'
+                            )
+                        ]) {
                             sh """
                               cat > settings-deploy.xml <<EOF
 <settings>
   <servers>
     <server>
       <id>${repoId}</id>
-      <username>\${NEXUS_DEPLOY_USR}</username>
-      <password>\${NEXUS_DEPLOY_PSW}</password>
+      <username>\\\${NEXUS_DEPLOY_USR}</username>
+      <password>\\\${NEXUS_DEPLOY_PSW}</password>
     </server>
   </servers>
 </settings>
@@ -170,16 +177,16 @@ EOF
         }
 
         stage('Upload JAR to S3') {
-            when {
-                expression { currentBuild.currentResult == 'SUCCESS' }
-            }
+            when { expression { currentBuild.currentResult == 'SUCCESS' } }
             steps {
                 dir('complete/target') {
-                    withCredentials([usernamePassword(
-                        credentialsId: env.AWS_CREDS_ID,
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    )]) {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: env.AWS_CREDS_ID,
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
                         sh """
                           aws s3 cp ${env.ARTIFACT_ID}-${env.VERSION}.jar \\
                                     s3://${BUCKET_NAME}/${env.ARTIFACT_ID}-${env.VERSION}.jar \\
@@ -189,25 +196,24 @@ EOF
                 }
             }
         }
-    }
 
-    // ---------- Deploy to Staging ----------
+        // ---------- Deploy to Staging ----------
         stage('Deploy to Staging') {
-            when {
-                expression { currentBuild.currentResult == 'SUCCESS' }
-            }
+            when { expression { currentBuild.currentResult == 'SUCCESS' } }
             steps {
                 script {
-                    def beAppName       = 'rest-service-initial'
-                    def beEnvName       = 'rest-service-staging'
-                    def versionLabel    = "${env.ARTIFACT_ID}-${env.VERSION}-${env.BUILD_ID}"
-                    def s3Key           = "${env.ARTIFACT_ID}-${env.VERSION}.jar"
+                    def beAppName    = 'rest-service-initial'
+                    def beEnvName    = 'rest-service-staging'
+                    def versionLabel = "${env.ARTIFACT_ID}-${env.VERSION}-${env.BUILD_ID}"
+                    def s3Key        = "${env.ARTIFACT_ID}-${env.VERSION}.jar"
 
-                    withCredentials([usernamePassword(
-                        credentialsId: env.AWS_CREDS_ID,
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    )]) {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: env.AWS_CREDS_ID,
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
                         sh """
                           aws elasticbeanstalk create-application-version \\
                             --application-name ${beAppName} \\
@@ -215,7 +221,6 @@ EOF
                             --source-bundle S3Bucket=${BUCKET_NAME},S3Key=${s3Key} \\
                             --region us-east-1
                         """
-
                         sh """
                           aws elasticbeanstalk update-environment \\
                             --application-name ${beAppName} \\
@@ -227,16 +232,16 @@ EOF
                 }
             }
         }
-        
     }
 
     post {
         success {
-            echo "✅ Artifact ${env.ARTIFACT_ID}:${env.VERSION} successfully published to Nexus and uploaded to S3"
+            echo "✅ Artifact ${env.ARTIFACT_ID}:${env.VERSION} successfully published to Nexus, uploaded to S3 и deployed to staging"
         }
         failure {
-            echo "❌ Build, deploy or upload failed"
+            echo "❌ Build, deploy, or upload finished with an error"
         }
     }
-    
+}
+
 
