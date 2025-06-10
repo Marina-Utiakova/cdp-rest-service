@@ -6,7 +6,7 @@ pipeline {
 
     environment {
         // Nexus
-        NEXUS_HOSTPORT      = '3.82.252.70:8081'
+        NEXUS_HOSTPORT      = '54.166.59.181:8081'
         NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
         NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
         REPO_RELEASE        = 'vprofile-release'
