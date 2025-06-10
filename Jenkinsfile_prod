@@ -1,0 +1,94 @@
+pipeline {
+    agent any
+
+    // Parameter: version approved in staging
+    parameters {
+        string(
+            name: 'VERSION_LABEL',
+            defaultValue: '',
+            description: 'VersionLabel from staging, e.g.: rest-service-complete-0.0.1-SNAPSHOT-22'
+        )
+    }
+
+    environment {
+        // Beanstalk application name (should match staging)
+        BE_APP_NAME      = 'rest-service-initial'
+        // Beanstalk production environment name
+        BE_PROD_ENV      = 'rest-service-production'
+        // AWS credentials ID in Jenkins (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+        AWS_CREDS_ID     = 'aws-creds'
+        // S3 bucket where staging uploaded the artifact
+        BUCKET_NAME      = 'cdp-project-artifacts'
+        // (Optional) Slack channel
+        SLACK_CHANNEL    = '#devops-jenkins-project-logs'
+    }
+
+    stages {
+        stage('Validate versionLabel') {
+            steps {
+                script {
+                    if (!params.VERSION_LABEL?.trim()) {
+                        error "VERSION_LABEL is not set. Please provide, e.g.: rest-service-complete-0.0.1-SNAPSHOT-22"
+                    }
+                    echo "Deploying production version: ${params.VERSION_LABEL}"
+                }
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                script {
+                    // Trim the "-BUILD_ID" suffix from versionLabel to get the JAR name in S3
+                    def baseKey = params.VERSION_LABEL.replaceFirst(/-[0-9]+$/, '') + ".jar"
+                    echo "Expecting artifact in S3 with key: ${baseKey}"
+
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: env.AWS_CREDS_ID,
+                            usernameVariable: 'AWS_ACCESS_KEY_ID',
+                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                        )
+                    ]) {
+                        // 1) Create application version (if not exists)
+                        sh """
+                          aws elasticbeanstalk create-application-version \\
+                            --application-name ${env.BE_APP_NAME} \\
+                            --version-label ${params.VERSION_LABEL} \\
+                            --source-bundle S3Bucket=${env.BUCKET_NAME},S3Key=${baseKey} \\
+                            --region us-east-1 || echo "Version already exists or failed to create, continuing..."
+                        """
+
+                        // 2) Update the production environment to this version
+                        sh """
+                          aws elasticbeanstalk update-environment \\
+                            --application-name ${env.BE_APP_NAME} \\
+                            --environment-name ${env.BE_PROD_ENV} \\
+                            --version-label ${params.VERSION_LABEL} \\
+                            --region us-east-1
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Production environment '${env.BE_PROD_ENV}' updated to version ${params.VERSION_LABEL}"
+            // If you want Slack notification, uncomment below:
+            // slackSend channel: "${env.SLACK_CHANNEL}",
+            //           color: 'good',
+            //           message: "*Prod Deployment SUCCESS:* ${env.BE_PROD_ENV} updated to ${params.VERSION_LABEL}\\n${env.BUILD_URL}"
+        }
+        failure {
+            echo "❌ Failed to deploy version ${params.VERSION_LABEL} to production"
+            // Slack notification on failure:
+            // slackSend channel: "${env.SLACK_CHANNEL}",
+            //           color: 'danger',
+            //           message: "*Prod Deployment FAILED:* ${env.BE_PROD_ENV} attempted ${params.VERSION_LABEL}\\n${env.BUILD_URL}"
+        }
+    }
+}
+
+
+
