@@ -1,0 +1,88 @@
+cat > src/main/resources/static/index.html <<'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome to REST Service</title>
+  <style>
+    /* Fullscreen background image */
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('https://source.unsplash.com/1600x900/?beach,sunny') no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    /* Полупрозрачный контейнер с текстом поверх фона */
+    .container {
+      background: rgba(0, 0, 0, 0.5); /* полупрозрачный черный */
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 700px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 0.5em;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+    }
+    p {
+      font-size: 1.1em;
+      line-height: 1.5em;
+      margin-bottom: 1em;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    }
+    a.button {
+      display: inline-block;
+      padding: 12px 24px;
+      margin: 8px;
+      font-size: 1em;
+      color: #fff;
+      background: rgba(255, 165, 0, 0.8); /* оранжево-желтый */
+      border: none;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: background 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    a.button:hover {
+      background: rgba(255, 140, 0, 0.9);
+    }
+    /* Небольшой анимационный эффект волн внизу */
+    .wave {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100px;
+      background: url('data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 28" preserveAspectRatio="none">\
+<path d="M0 20 Q30 0 60 20 T120 20 V28 H0 Z" fill="rgba(255,255,255,0.3)"/>\
+</svg>') repeat-x;
+      animation: wave-animation 8s linear infinite;
+      opacity: 0.7;
+    }
+    @keyframes wave-animation {
+      from { background-position-x: 0; }
+      to { background-position-x: 120px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌴 Welcome to My REST Service 🌊</h1>
+    <p>This is the home page of your REST service, styled with a beach theme. Enjoy the view!</p>
+    <p>To get a greeting JSON, click the button below:</p>
+    <a href="/greeting" class="button">Get Greeting</a>
+  </div>
+  <div class="wave"></div>
+</body>
+</html>
+EOF
