@@ -19,8 +19,8 @@ pipeline {
         AWS_CREDS_ID     = 'aws-creds'
         // S3 bucket where staging uploaded the artifact
         BUCKET_NAME      = 'cdp-project-artifacts'
-        // (Optional) Slack channel
-        SLACK_CHANNEL    = '#devops-jenkins-project-logs'
+        // Slack channel
+        SLACK_CHANNEL    = '#cdp-notifications'
     }
 
     stages {
@@ -74,21 +74,26 @@ pipeline {
 
     post {
         success {
+            // Notify Slack on successful deployment
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'good',
+                      message: ":white_check_mark: Production environment `${env.BE_PROD_ENV}` updated successfully to version `${params.VERSION_LABEL}`\nJob: `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
             echo "✅ Production environment '${env.BE_PROD_ENV}' updated to version ${params.VERSION_LABEL}"
-            // If you want Slack notification, uncomment below:
-            // slackSend channel: "${env.SLACK_CHANNEL}",
-            //           color: 'good',
-            //           message: "*Prod Deployment SUCCESS:* ${env.BE_PROD_ENV} updated to ${params.VERSION_LABEL}\\n${env.BUILD_URL}"
         }
         failure {
+            // Notify Slack on failure
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'danger',
+                      message: ":x: Production deploy FAILED for version `${params.VERSION_LABEL}` on environment `${env.BE_PROD_ENV}`\nJob: `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
             echo "❌ Failed to deploy version ${params.VERSION_LABEL} to production"
-            // Slack notification on failure:
-            // slackSend channel: "${env.SLACK_CHANNEL}",
-            //           color: 'danger',
-            //           message: "*Prod Deployment FAILED:* ${env.BE_PROD_ENV} attempted ${params.VERSION_LABEL}\\n${env.BUILD_URL}"
+        }
+        unstable {
+            // Notify Slack if build is unstable
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'warning',
+                      message: ":warning: Production build UNSTABLE for version `${params.VERSION_LABEL}` on environment `${env.BE_PROD_ENV}`\nJob: `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
+        }
+        // If you want a notification in all cases (including aborted):
+        always {
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'good',
+                    message: ":information_source: Production pipeline finished with status `${currentBuild.currentResult}` for version `${params.VERSION_LABEL}`\nJob: `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
         }
     }
 }
-
-
-

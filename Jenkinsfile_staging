@@ -6,7 +6,7 @@ pipeline {
 
     environment {
         // Nexus
-        NEXUS_HOSTPORT      = '54.166.59.181:8081'
+        NEXUS_HOSTPORT      = '44.204.25.245:8081'
         NEXUS_DOWNLOAD_CRED = 'nexus-user-pass'
         NEXUS_UPLOAD_CRED   = 'nexus-ci-creds'
         REPO_RELEASE        = 'vprofile-release'
@@ -19,6 +19,9 @@ pipeline {
         // SonarQube (Jenkins → Configure System → SonarQube servers and SonarScanner)
         SONAR_SERVER_ID     = 'MySonarQube'
         SONAR_SCANNER_TOOL  = 'sonar-scanner'
+
+        // Slack channel
+        SLACK_CHANNEL       = '#cdp-notifications'
     }
 
     stages {
@@ -236,12 +239,22 @@ EOF
 
     post {
         success {
-            echo "✅ Artifact ${env.ARTIFACT_ID}:${env.VERSION} successfully published to Nexus, uploaded to S3 и deployed to staging"
+            // Slack notification on success
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'good',
+                      message: ":white_check_mark: *Staging build SUCCESS* \nJob `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
+        }
+        unstable {
+            // Slack notification if build is unstable 
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'warning',
+                      message: ":warning: *Staging build UNSTABLE* \nJob `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
         }
         failure {
-            echo "❌ Build, deploy, or upload finished with an error"
+            // Slack notification on failure
+            slackSend channel: "${env.SLACK_CHANNEL}", color: 'danger',
+                      message: ":x: *Staging build FAILED* \nJob `${env.JOB_NAME}` #${env.BUILD_NUMBER}\n${env.BUILD_URL}"
+        }
+        always {
+            slackSend channel: "${env.SLACK_CHANNEL}", message: ":information_source: Staging pipeline finished (result: ${currentBuild.currentResult})"
         }
     }
 }
-
-
